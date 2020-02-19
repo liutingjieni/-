@@ -130,6 +130,150 @@ bool http_conn::read()
         return false;
     int bytes_read = 0;
     while (true) {
-        bytes_read = recv(m_sockfd, m)
+        bytes_read = recv(m_sockfd, m_read_buf + m_read_idx, 
+                          READ_BUFFER_SIZE - m_read_idx, 0);
+        if (bytes_read == -1) {
+            if (errno == EAGIN || errno == EWOULDBLOCK) 
+                break;
+            return false;
+        }
+        else if (bytes_read == 0) {
+            return false;
+        }
+        m_read_idx += bytes_read;
     }
+    return true;
 }
+
+http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
+{
+    m_url = strpbrk(text, " \t");
+    if (!m_url) {
+        return BAD_REQUEST;
+    }
+    *m_url++ = '\0';
+
+    char *method = text;
+    if (strcasecmp(method, "GET") == 0) {
+        m_method = GET;
+    }
+    else {
+        return BAD_REQUEST;
+    }
+    m_url += strspn(m_url, " \t");
+    m_version = strpbrk(m_url, " \t");
+    if (!m_version) {
+        return BAD_REQUEST;
+    }
+    *m_version++ = '\0';
+    m_version += strspn(m_version, "\t");
+    
+    if (strcasecmp(m_version, "HTTP/1.1") != 0) {
+        return BAD_REQUEST;
+    } 
+    if (strncasecmp(m_url, "http://", 7) == 0) {
+        m_url += 7;
+        m_url = strchr(m_url, '/');
+    }
+    if (!m_url || m_url[0] != '/') {
+        return BAD_REQUEST;
+    }
+    m_check_state = CHECK_STATE_HEADER;
+    return NO_REQUEST;
+
+}
+
+http_conn::HTTP_CODE　http_conn::parse_headers(char *text)
+{
+    if (text[0] == '\0') {
+        if (m_context_length != 0) {
+            m_check_state = CHECK_STATE_CONTENT;
+            return NO_REQUEST;
+        }
+        return GET_REQUEST;
+    }
+    else if (strncasecmp(tetx, "Connection:", 11) == 0) {
+        text += 11;
+        text += strspn(tetx, "\t");
+        if (strcasecmp(text, "kepp-alive") == 0) {
+            m_linger = true;
+        }
+    }
+    else if (strncasecmp(text, "Content-Length:", 15) == 0) {
+        text += 15;
+        text += strspn(tetx, " \t");
+        m_content_length = atol(text);
+    }
+    else if (strncasecmp(text, "Host:", 5) == 0) {
+        text += 5;
+        text += strspn(tetx, " \t");
+        m_host = text;
+    }
+    else {
+        printf("oop! unknown header %s\n", text);
+    }
+    return NO_REQUEST;
+}
+
+http_conn::HTTP_CODE http_conn::parse_content(char *text)
+{
+    if (m_read_idx >= (m_content_length += m_checked_idx)) {
+        text[m_context_length] = '\0';
+        return GET_REQUEST;
+    }
+    return NO_REQUEST;
+}
+
+http_conn::HTTP_CODE http_conn::process_read()
+{
+    LINE_STATE line_status = LINE_OK;
+    HTTP_CODE ret = NO_REQUEST;
+    char *text = 0;
+
+    while (((m_check_state == CHECK_STATE_CONTENT) && (line_status == LINE_OK))
+           || ((line_status == parse_line()) == LINE_OK) ) {
+               text = get_line();
+               m_start_line = m_checked_idx;
+               printf("got 1 http line: %s\n", text);
+
+               switch(m_check_state) 
+               {
+                   case CHECK_STATE_REQUESTLINE:
+                   {
+                       ret = parse_request_line(text);
+                       if (ret = BAD_REQUEST) 
+                            return BAD_REQUEST;
+                       break;
+                   }
+                   case CHECK_STATE_HEADER:
+                   {
+                       ret = parse_headers(text);
+                       if (ret = BAD_REQUEST) 
+                            return BAD_REQUEST;
+                       else if (ret = GET_REQUEST) 
+                            return do_request();
+                       break;
+                   }
+                   cse CHECK_STATE_CONTENT:
+                   {
+                       ret = parse_content(text);
+                       if (ret = GET_REQUEST)
+                            return do_request();
+                       line_status = LINE_OPEN;
+                       break;
+                   }
+                   defult:
+                    return INTERNAL_ERROR;
+               }
+    }
+    return  NO_REQUEST;
+}
+
+http_conn::HTTP_CODE http_conn::do_request()
+{
+    strcpy(m_real_life, doc_root);
+    int len = strlen(doc_root);
+    strncpy(m_real_life)
+}
+
+
