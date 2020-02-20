@@ -25,7 +25,7 @@
 #include <sys/mman.h>
 #include <stdarg.h>
 #include <errno.h>
-
+#include "threadpool.h"
 class http_conn {
 public:
     static const int FILENAME_LEN = 200;
@@ -42,8 +42,8 @@ public:
                      INTERNAL_ERROR, CLOSED_CONNECTION };
     enum LINE_STATUS { LINE_OK = 0, LINE_BAD, LINE_OPEN };
 
-    http_conn();
-    ~http_conn();
+    http_conn() {}
+    ~http_conn() {}
 
     void init(int sockfd, const sockaddr_in &addr);
     void close_conn(bool real_close = true);
@@ -655,7 +655,7 @@ int main(int argc, char *argv[])
                 users[connfd].init(connfd, client_address);
             }
             else if (events[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR)) {
-                users[connfd].close_conn();
+                users[sockfd].close_conn();
             }
             else if(events[i].events & EPOLLIN) {
                 if (users[sockfd].read()) {
