@@ -607,24 +607,25 @@ int main(int argc, char *argv[])
     assert(users);
     int user_count = 0;
 
-    int listenfd = socket(PF_INET, SOCK_STREAM, 0);
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    printf("listenfd %d\n", listenfd);
     assert(listenfd >= 0);
     struct linger tmp = {1, 0};
     setsockopt(listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
-    
+
     int ret = 0;
     struct sockaddr_in address;
     bzero(&address, sizeof(address));
     address.sin_family = AF_INET;
-    inet_pton(AF_INET, ip, &address.sin_family);
+    inet_pton(AF_INET, ip, &address.sin_addr);
     address.sin_port = htons(port);
 
     ret = bind(listenfd, (struct sockaddr *)&address, sizeof(address));
-    assert(ret != 0);
+    assert(ret != -1);
 
     ret = listen(listenfd, 5);
     assert(ret != -1);
-
+    printf("listen ret %d\n", ret);
     struct epoll_event events[MAX_EVENT_NUMBER];
     int epollfd = epoll_create(5);
     assert(epollfd != -1);
@@ -633,11 +634,12 @@ int main(int argc, char *argv[])
 
     while(true) {
         int number = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+        if (number == 0) printf("epoll_wait fanhui\n");
         if (number < 0 && errno != EINTR){
             printf("epoll failure\n");
             break;
         }
-
+        printf("epoll %d\n", number);
         for (int i = 0; i < number; i++) {
             int sockfd = events[i].data.fd;
             if (sockfd == listenfd) {
