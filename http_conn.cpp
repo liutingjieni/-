@@ -8,6 +8,8 @@
 //#include "http_conn.h"
 #define HTTPCONNECTION_H
 
+#include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -49,7 +51,7 @@ public:
     void close_conn(bool real_close = true);
     void process();
     bool read();
-    bool write();
+    //bool write();
 
 private:
     void init();
@@ -145,7 +147,7 @@ void modfd(int epollfd, int fd, int ev)
 {
     epoll_event event;
     event.data.fd = fd;
-    event.events = ev | EPOLLET || EPOLLONESHOT | EPOLLRDHUP;
+    event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
     epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
 }
 
@@ -154,6 +156,7 @@ int http_conn::m_epollfd = -1;
 
 void http_conn::close_conn(bool real_close)
 {
+    printf("close_conn\n");
     if (real_close && (m_sockfd != -1)) {
         removefd(m_epollfd, m_sockfd);
         m_sockfd = -1;
@@ -225,9 +228,12 @@ bool http_conn::read()
     if (m_read_idx >= READ_BUFFER_SIZE) 
         return false;
     int bytes_read = 0;
+    printf("read\n");
     while (true) {
         bytes_read = recv(m_sockfd, m_read_buf + m_read_idx, 
                           READ_BUFFER_SIZE - m_read_idx, 0);
+        printf("recv bytes_read = %d\n", bytes_read);
+        printf("客户端发过来的请求: %s\n", m_read_buf);
         if (bytes_read == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
                 break;
@@ -243,6 +249,7 @@ bool http_conn::read()
 
 http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
 {
+    printf("text %s##############\n", text);
     m_url = strpbrk(text, " \t");
     if (!m_url) {
         return BAD_REQUEST;
@@ -394,7 +401,7 @@ void http_conn::unmap()
     }
 }
 
-bool http_conn::write()
+/*bool http_conn::write()
 {
     int temp = 0;
     int bytes_have_send = 0;
@@ -431,7 +438,7 @@ bool http_conn::write()
             }
         }
     }
-}
+}*/
 
 
 bool http_conn::add_response(const char* format, ...)
@@ -557,7 +564,36 @@ bool http_conn::process_write(HTTP_CODE ret)
 
 void http_conn::process()
 {
-    HTTP_CODE read_ret = process_read();
+    printf("process %s@@@@@@@@@@@\n", m_read_buf);
+
+    char filename[FILENAME_LEN];
+    sscanf(m_read_buf,"GET /%s", filename);
+    printf("filename %s&&&&&&&\n", filename);
+
+    char mime[FILENAME_LEN];
+    
+    if (strstr(filename, ".html")) {
+        strcpy(mime, "text/html");
+    }
+    else if (strstr(filename, ".jpg")) {
+        strcpy(mime,  "image/jpeg");
+    }
+    char response[100];
+    sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type:%s\r\n\r\n", mime);
+
+    write(m_sockfd, response, strlen(response));
+    std::cout << m_sockfd << response;
+
+    bzero(response, sizeof(response));
+    std::ifstream in(filename);
+    
+    in >> response;
+
+    std::cout << response;
+    write(m_sockfd, response, 100);
+
+
+   /* HTTP_CODE read_ret = process_read();
     if (read_ret == NO_REQUEST) {
         modfd(m_epollfd, m_sockfd, EPOLLIN);
         return;
@@ -566,7 +602,8 @@ void http_conn::process()
     bool write_ret = process_write(read_ret);
     if (!write_ret) {
         close_conn();
-    }
+    }*/
+
     modfd(m_epollfd, m_sockfd, EPOLLOUT);
 }
 
@@ -646,6 +683,7 @@ int main(int argc, char *argv[])
                 struct sockaddr_in client_address;
                 socklen_t client_addrlenghth = sizeof(client_address);
                 int connfd = accept(listenfd, (struct sockaddr *)&client_address, &client_addrlenghth);
+                printf("connfd  %d\n", connfd);
                 if (connfd < 0) {
                     printf("errno is : %d\n", errno);
                     continue;
@@ -656,11 +694,14 @@ int main(int argc, char *argv[])
                 }
                 users[connfd].init(connfd, client_address);
             }
-            else if (events[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR)) {
+            else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
+                printf("&&&&&\n");
                 users[sockfd].close_conn();
             }
             else if(events[i].events & EPOLLIN) {
+                printf("%%%%%%%%%%\n");
                 if (users[sockfd].read()) {
+                    printf("lallala\n");
                     pool->append(users + sockfd);
                 }
                 else {
@@ -668,9 +709,10 @@ int main(int argc, char *argv[])
                 }
             }
             else if (events[i].events & EPOLLOUT) {
-                if (!users[sockfd].write()) {
-                    users[sockfd].close_conn();
-                }
+                printf("^^^^^^^^^\n");
+            //    if (!users[sockfd].write()) {
+              //      users[sockfd].close_conn();
+               // }
             }
 
         }
