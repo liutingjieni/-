@@ -228,11 +228,9 @@ bool http_conn::read()
     if (m_read_idx >= READ_BUFFER_SIZE) 
         return false;
     int bytes_read = 0;
-    printf("read\n");
     while (true) {
         bytes_read = recv(m_sockfd, m_read_buf + m_read_idx, 
                           READ_BUFFER_SIZE - m_read_idx, 0);
-        printf("recv bytes_read = %d\n", bytes_read);
         printf("客户端发过来的请求: %s\n", m_read_buf);
         if (bytes_read == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
@@ -249,7 +247,6 @@ bool http_conn::read()
 
 http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
 {
-    printf("text %s##############\n", text);
     m_url = strpbrk(text, " \t");
     if (!m_url) {
         return BAD_REQUEST;
@@ -564,8 +561,6 @@ bool http_conn::process_write(HTTP_CODE ret)
 
 void http_conn::process()
 {
-    printf("process %s@@@@@@@@@@@\n", m_read_buf);
-
     char filename[FILENAME_LEN];
     sscanf(m_read_buf,"GET /%s", filename);
     printf("filename %s&&&&&&&\n", filename);
@@ -581,8 +576,7 @@ void http_conn::process()
     char response[100];
     sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type:%s\r\n\r\n", mime);
 
-    write(m_sockfd, response, strlen(response));
-    std::cout << m_sockfd << response;
+    write(m_sockfd, response, 100);
 
     bzero(response, sizeof(response));
     std::ifstream in(filename);
@@ -645,7 +639,6 @@ int main(int argc, char *argv[])
     int user_count = 0;
 
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    printf("listenfd %d\n", listenfd);
     assert(listenfd >= 0);
     struct linger tmp = {1, 0};
     setsockopt(listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
@@ -662,7 +655,6 @@ int main(int argc, char *argv[])
 
     ret = listen(listenfd, 5);
     assert(ret != -1);
-    printf("listen ret %d\n", ret);
     struct epoll_event events[MAX_EVENT_NUMBER];
     int epollfd = epoll_create(5);
     assert(epollfd != -1);
@@ -676,14 +668,12 @@ int main(int argc, char *argv[])
             printf("epoll failure\n");
             break;
         }
-        printf("epoll %d\n", number);
         for (int i = 0; i < number; i++) {
             int sockfd = events[i].data.fd;
             if (sockfd == listenfd) {
                 struct sockaddr_in client_address;
                 socklen_t client_addrlenghth = sizeof(client_address);
                 int connfd = accept(listenfd, (struct sockaddr *)&client_address, &client_addrlenghth);
-                printf("connfd  %d\n", connfd);
                 if (connfd < 0) {
                     printf("errno is : %d\n", errno);
                     continue;
@@ -695,13 +685,10 @@ int main(int argc, char *argv[])
                 users[connfd].init(connfd, client_address);
             }
             else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
-                printf("&&&&&\n");
                 users[sockfd].close_conn();
             }
             else if(events[i].events & EPOLLIN) {
-                printf("%%%%%%%%%%\n");
                 if (users[sockfd].read()) {
-                    printf("lallala\n");
                     pool->append(users + sockfd);
                 }
                 else {
@@ -709,7 +696,6 @@ int main(int argc, char *argv[])
                 }
             }
             else if (events[i].events & EPOLLOUT) {
-                printf("^^^^^^^^^\n");
             //    if (!users[sockfd].write()) {
               //      users[sockfd].close_conn();
                // }

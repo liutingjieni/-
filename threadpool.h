@@ -18,6 +18,7 @@ public:
     sem()
     {
         if (sem_init( &m_sem, 0, 0 ) != 0) {
+            printf("1");
             throw std::exception();
         }
     }
@@ -33,6 +34,7 @@ public:
     locker()
     {
         if (pthread_mutex_init(&m_mutex, NULL) != 0) {
+            printf("2");
             throw std::exception();
         } 
     }
@@ -72,13 +74,12 @@ threadpool<T>::threadpool(int thread_number, int max_requests):
         throw std::exception();
     }
     m_threads = new pthread_t[m_thread_number];
-    if (m_threads) {
+    if (!m_threads) {
         throw std::exception();
     }
 
     for (int i = 0; i < thread_number; i++) {
-        printf("create the %dth thread\n", i);
-        if (pthread_create(m_threads + 1, NULL, worker, this) != 0) {
+        if (pthread_create(m_threads + i, NULL, worker, this) != 0) {
             delete [] m_threads;
             throw std::exception();
         }
