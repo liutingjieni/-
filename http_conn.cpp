@@ -50,29 +50,13 @@ public:
     void init(int sockfd, const sockaddr_in &addr);
     void close_conn(bool real_close = true);
     void process();
-    bool read();
+    bool read_fun();
     bool write_fun();
 
 private:
     void init();
-    HTTP_CODE process_read();
-    bool process_write(HTTP_CODE ret);
-
-    HTTP_CODE parse_request_line(char *);
-    HTTP_CODE parse_headers(char *text);
-    HTTP_CODE parse_content(char *text);
-    HTTP_CODE do_request();
-    char *get_line() { return m_read_buf + m_start_line; }
-    LINE_STATUS parse_line();
 
     void unmap();
-    bool add_response(const char *format, ...);
-    bool add_content(const char *content);
-    bool add_status_line(int status, const char *title);
-    bool add_headers(int content_length);
-    bool add_content_length(int content_length);
-    bool add_linger();
-    bool add_blank_line();
 
 public:
     static int m_epollfd;
@@ -186,35 +170,9 @@ void http_conn::init()
     memset(m_real_file, '\0', FILENAME_LEN);
 }
 
-http_conn::LINE_STATUS http_conn::parse_line()
-{
-    char temp;
-    for ( ; m_checked_idx < m_read_idx; ++m_checked_idx) {
-        temp = m_read_buf[m_checked_idx];
-        if (temp == '\r') {
-            if (m_checked_idx + 1 == m_read_idx)  
-                return LINE_OPEN;
-            else if (m_read_buf[m_checked_idx + 1] == '\n') {
-                m_read_buf[m_checked_idx++] == '\0';
-                m_read_buf[m_checked_idx++] == '\0';
-                return LINE_OK;
-            }
-            return LINE_BAD;
-        }
-        else if (temp == '\n') {
-            if (m_checked_idx > 1 && m_read_buf[m_checked_idx -1] == '\r') {
-                m_read_buf[m_checked_idx++] == '\0';
-                m_read_buf[m_checked_idx++] == '\0';
-                return LINE_OK;    
-            }
-            return LINE_BAD;
 
-        }
-    }
-    return LINE_OPEN;
-}
 
-bool http_conn::read()
+bool http_conn::read_fun()
 {
     if (m_read_idx >= READ_BUFFER_SIZE) 
         return false;
@@ -307,12 +265,18 @@ void http_conn::process()
     write(m_sockfd, response, 100);
 
     bzero(response, sizeof(response));
-    std::ifstream in(filename);
+    /*std::ifstream in(filename);
     
     in >> response;
 
-    std::cout << response;
-    write(m_sockfd, response, 100);
+    std::cout << response;*/
+    int fd = open(filename, O_RDONLY);
+    int rlen = 0;
+    while ((rlen = read(fd, response, 100)) > 0) {
+        write(m_sockfd, response, rlen);
+        printf("%s\n", response);
+        bzero(response, sizeof(response));
+    }
 
 
    /* HTTP_CODE read_ret = process_read();
@@ -416,7 +380,7 @@ int main(int argc, char *argv[])
                 users[sockfd].close_conn();
             }
             else if(events[i].events & EPOLLIN) {
-                if (users[sockfd].read()) {
+                if (users[sockfd].read_fun()) {
                     pool->append(users + sockfd);
                 }
                 else {
