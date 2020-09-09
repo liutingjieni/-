@@ -21,4 +21,5 @@ int main()
 {
     pthread_t tid1;
     pthread_create(&tid1, NULL, thread_fun, NULL);
+    sleep(10);
 }

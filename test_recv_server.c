@@ -27,26 +27,6 @@
 
 #define EXIT       0
 #define LOGIN      1
-#define REGIST     2
-#define REPASSWD   3
-#define ADD_FRIEND 4
-#define LIST_FRI   5
-#define ONLINE_FRI 6
-#define CHAT_FRI   7
-#define STORE_CHAT 8
-#define DELE_FRI   9
-#define CREAT_GROUP 10
-#define JOIN_GROUP  11
-#define QUIT_GROUP  12
-#define DELE_GROUP  13
-#define GROUP_MES   14
-#define CHAT_GROUP  15
-#define STORE_G     16
-#define SET_UP      17
-#define SEND_FILE   18
-#define OK_FILE     19
-#define JOIN_USER   20
-#define DELE_USER   21
 
 typedef struct package {
         int  type;
@@ -59,36 +39,7 @@ typedef struct package {
 
 } PACK;
 
-typedef struct friends {  //好友列表
-                           int  account[50];
-                           char name[50][100];
-                           int online[50];
-                           int  len;
-                       }fri;
-
-typedef struct store_chat { //私聊记录
-                              int account[100];
-                              int send_account[100];
-                              char mes[100][1000];
-                              int len;
-                          }STR;
-
-typedef struct group {  //群信息
-                         int account[50];
-                         char name[50][100];
-                         int online[50];
-                         int cli_fd[50];
-                         int flag[50];
-                         int len;
-                     }GROUP;
-
-typedef struct store_group {
-        int usr_account[100];
-        char use_name[100][100];
-        char mes[100][1000];
-        int len;
-
-}STR_G;
+ void *callback(void *arg);
 
 
  void my_err(const char * err_string,int line)
@@ -99,7 +50,9 @@ typedef struct store_group {
 
  }
 
- int init()
+void recv_PACK(int cli_fd);
+
+ int main()
  {
          int sock_fd,epoll_fd,fd_num,conn_fd;
          struct sockaddr_in serv_addr;
@@ -170,25 +123,9 @@ typedef struct store_group {
          }
                      else if (events[i].events & EPOLLIN)
          {
-                            recv_PACK(events[i].data.fd);
-                            //n = recv(events[i].data.fd, &recv_t, sizeof(PACK), 0);
-             //                // recv_t.data.send_fd = events[i].data.fd;
-             //                            
-         }
-                 
-     }
-         
- }
-
-
-
- }
-void recv_PACK(int conn_fd)
-{
         PACK pack;
-        cli_fd = conn_fd;
         int ret;
-    if((ret = recv(cli_fd, &pack,sizeof(PACK) ,MSG_WAITALL)) < 0) {
+    if((ret = recv(conn_fd, &pack,sizeof(PACK) ,MSG_WAITALL)) < 0) {
                 perror("server_recv");
             
     }
@@ -200,9 +137,31 @@ void recv_PACK(int conn_fd)
                     printf("%d\n", pack.type);
                     break;
                 case 2:
-                    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, &ev);//注册epoll事件
-                    recv(cli_fd, &pack,sizeof(PACK) ,MSG_WAITALL);
-                        printf("cli_fd = %d\n", cli_fd); 
+                    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, &ev);//注册epoll
+                    pthread_t pid;
+                    pthread_create(&pid, NULL, callback, &conn_fd);
                     
     }
-}
+                            //n = recv(events[i].data.fd, &recv_t, sizeof(PACK), 0);
+             //                // recv_t.data.send_fd = events[i].data.fd;
+             //                            
+         }
+                 
+     }
+         
+ }
+
+
+ }
+
+ void *callback(void *arg)
+ {
+     int fd = *(int *)arg;
+    while(1) {
+     PACK pack;
+    int ret =recv(fd, &pack,sizeof(PACK) ,MSG_WAITALL);
+        if (ret = 0)  break;
+        printf("cli_fd = %d\n", pack.account); 
+     
+    }
+ }
