@@ -16,13 +16,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <fcntl.h>
 using namespace std;
 
 static const char *request = "GET http://localhost/index.html HTTP/1.1\r\nConnection: keep-alive\r\n\r\nxxxxxxxxxxxx";
 
 int setnonblocking(int fd)
 {
-    int old_option = fcntl(fd, F_GETFL);
+    int old_option = fcntl(fd, F_GETFL, 0);
     int new_option = old_option | O_NONBLOCK;
     fcntl(fd, F_SETFL, new_option);
     return old_option;
@@ -111,26 +112,26 @@ int main(int argc, char *argv[])
 
     while(1) {
         int fds = epoll_wait(epoll_fd, events, 10000, 2000);
-        printf("lala %d\n\n", fds);
         for (int i = 0; i < fds; i++ ) {
             int sockfd = events[i].data.fd;
             if (events[i].events & EPOLLIN) {
-                printf("readddddddddddddddd\n");
                 if (!read_once(sockfd, buffer, 100)) {
                     close_conn(epoll_fd, sockfd);
                 }
+               struct epoll_event event;
+                event.events = EPOLLOUT;
+                event.data.fd = sockfd;
+
+                epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sockfd, &event);
+            
             }
             else if (events[i].events & EPOLLOUT) {
-                printf("writeeeeeeeeeeee\n");
                 if (!write_nbytes(sockfd, request, strlen(request))) {
                     close_conn(epoll_fd, sockfd);
                 }
                 struct epoll_event event;
-                printf("%x\n", event.events);
                 event.events = EPOLLIN;
-                printf("%x\n", event.events);
                 event.data.fd = sockfd;
-
                 epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sockfd, &event);
             }
             else if (events[i].events & EPOLLERR) {
