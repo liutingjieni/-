@@ -95,7 +95,7 @@ void send_regist_PACK(int conn_fd)
         if(send(cli_fd, &pack, sizeof(PACK),0)<0){
                 perror("send");
     }
-    
+    sleep(10);
     printf("2 = %d\n", i);
     }
 

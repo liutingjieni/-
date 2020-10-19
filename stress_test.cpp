@@ -62,9 +62,7 @@ bool read_once(int sockfd, char *buffer, int len)
 {
     int bytes_read = 0;
     memset(buffer, '\0', len);
-    printf("read\n");
     bytes_read = recv(sockfd, buffer, len, 0);
-    printf("read in %d bytes from socket %d with content %s\n", bytes_read, sockfd, buffer);
     if (bytes_read == -1) {
         return false;
     } else if (bytes_read == 0) {
@@ -118,12 +116,11 @@ int main(int argc, char *argv[])
                 if (!read_once(sockfd, buffer, 100)) {
                     close_conn(epoll_fd, sockfd);
                 }
-               struct epoll_event event;
+                struct epoll_event event;
                 event.events = EPOLLOUT;
                 event.data.fd = sockfd;
 
                 epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sockfd, &event);
-            
             }
             else if (events[i].events & EPOLLOUT) {
                 if (!write_nbytes(sockfd, request, strlen(request))) {
